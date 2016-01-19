@@ -1,1 +1,0 @@
-This graph looks at how the Senate and House Democrats and Republicans have voted with or against the President over the years. It's clear what the President's party is by Congress' voting patterns. More info [here.](https://ilanthedataman.squarespace.com/understanding-the-data-game/2013/12/23/spite)
