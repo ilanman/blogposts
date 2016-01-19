@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html>  
+<meta charset="utf-8">
+<style>
+
+body {
+  font: 8px sans-serif;
+}
+
+.axis path,
+.axis line {
+  fill: none;
+  stroke: #000;
+  shape-rendering: crispEdges;
+}
+
+.x.axis path {
+  fill: none;
+  size: 15px;
+  stroke: #000;
+  shape-rendering: crispEdges;
+}
+
+.line {
+  fill: none;
+  stroke-width: 5px;
+}
+
+.Body {opacity: 0.3;}
+.Body:hover {opacity:1;}
+
+</style>
+<body>
+
+  <div>
+  <p id="menu"><b>Senate or House</b><br>Select Legislative Body:<select>
+    <option value="Senate">Senate</option>
+    <option value="House">House</option></select>
+  </div>
+  
+<script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+    
+<script>
+
+    var margin = {top: 20, right: 70, bottom: 30, left: 60},
+        w = 650 - margin.left - margin.right,
+        h = 450 - margin.top - margin.bottom,
+        x = d3.time.scale().range([0, w]),
+        y = d3.scale.linear().domain([0,1]).range([h, 0]),
+        parseDate = d3.time.format("%Y").parse;
+        
+    var color = d3.scale.ordinal().range(["#1f77b4", "#d62728"]); // to generate a different color for each path
+    
+    var sections,
+        filtered,
+        transpose;
+    
+    // where the line gets its properties, how it will be interpolated
+    var line = d3.svg.line()
+       .interpolate("basis")
+       .x(function(d) { return x(d.year); })
+       .y(function(d) { return y(d.stat); });
+    
+    // add svg box where viz will go    
+    var svg = d3.select("body").append("svg")
+        .attr("width", w + margin.left +  margin.right+40)
+        .attr("height", h + margin.top + margin.bottom+20)
+        .append("g")
+        .attr("transform", "translate(" + (+20+margin.left) + "," + margin.top + ")");
+
+    // define the x axis and its class, append it to svg 
+    var xAxis = d3.svg.axis()
+        .scale(x)
+        .orient("bottom")
+       svg.append("g")
+        .attr("class", "x axis");
+
+        yScale = d3.scale.linear().range([h, 0]);
+
+    // define the y axis and its class, append it to svg
+    var yAxis = d3.svg.axis()
+        .scale(yScale)
+        .orient("left")
+        .tickFormat(d3.format(".0%"))
+        svg.append("g")
+        .attr("class", "y axis");
+    
+    // force data to update when menu is changed    
+    var menu = d3.select("#menu select")
+                 .on("change", change);    
+          
+// run redraw function that will refresh whenever a new data series is selected 
+d3.json("spite.json",function(json){
+  sections = json
+  redraw();      
+}); 
+
+function change() {
+  d3.transition()
+      .duration(1500)
+      .each(redraw);
+}
+
+function redraw() {
+    
+    var nested = d3.nest()
+    .key(function(d) { return d.Body; })
+    .map(sections)
+
+    // get value from menu selection
+    // the option values are set in HTML and correspond
+    // to the Body value we used to nest the data  
+    var series = menu.property("value");
+
+    // only retrieve data from the selected series, using the nest we just created
+    var data = nested[series];
+
+    // the keyring variable contains only the names of the sections
+    var keyring = d3.keys(data[1]).filter(function(key) { 
+          return (key !== "Body" && key !== "year" && key != "South" && key != "President");
+      });
+
+    // get the year and # of votes, map them to each group separately 
+    var transpose = keyring.map(function(name) {
+            return {
+              name: name,
+              values: data.map(function(d) {
+                return {year: parseDate(d.year), stat: +d[name]};
+              })
+            };
+        });
+
+    x.domain([
+    d3.min(transpose, function(c) { return d3.min(c.values, function(v) { return v.year; }); }),
+    d3.max(transpose, function(c) { return d3.max(c.values, function(v) { return v.year; }); })
+  ]);
+
+    y.domain([
+    d3.min(transpose, function(c) { return d3.min(c.values, function(v) { return v.stat; }); }),
+    d3.max(transpose, function(c) { return d3.max(c.values, function(v) { return v.stat; }); })
+  ]);
+
+    var Body = svg.selectAll(".Body")
+      .data(transpose);
+
+    var BodyEnter = Body.enter().append("g")
+      .attr("class", "Body")
+      .attr("id", function(d) { return d.name; });
+       
+    BodyEnter.append("path")
+      .attr("class", "line")
+      .attr("d", function(d) { return line(d.values); })
+      .style("stroke", function(d) {  return  color(d.name); });
+
+    BodyEnter.append("text")
+     .attr("class", "names")
+    .style("font-family","sans-serif")
+     .datum(function(d) { return {name: d.name, value: d.values[d.values.length - 1]}; })
+     .attr("transform", function(d) { return "translate(" + x(d.value.year) + "," + y(d.value.stat) + ")"; })
+     .attr("x", 4)
+     .attr("dy", ".35em")
+     .text(function(d) { return d.name; });
+
+    var BodyUpdate = d3.transition(Body);
+
+    BodyUpdate.select("path")
+              .attr("d", function(d) { return line(d.values); });
+    
+    BodyUpdate.select("text")
+    			.style("font-family","sans-serif")
+              .attr("transform", function(d) { return "translate(" + x(d.values[d.values.length - 1].year) + "," + 
+                                                                     y(d.values[d.values.length - 1].stat) + ")";  });
+
+    d3.transition(svg).select(".y.axis")
+                        .call(yAxis);
+
+
+      Body.enter().append("text")
+                        .attr("transform", "rotate(-90)")
+                        .attr("dy", "1.2em")
+                        .style("text-anchor", "end")
+                        .style("stroke-width","2px")
+      					.style("font-family","sans-serif")
+                        .text("% Support"); 
+                          
+      d3.transition(svg).select(".x.axis")
+                        .attr("transform", "translate(0," + h + ")")
+                        .call(xAxis)
+                        .selectAll("text")  
+                        .style("text-anchor", "end")  
+                        .style("font-family","sans-serif")
+                        .attr("dx", "-.8em")
+                        .attr("dy", ".15em")
+                        .attr("transform", function(d) {
+                            return "rotate(-45)" 
+                        });
+}
+  </script>
+ </html>
