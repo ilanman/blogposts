@@ -1,4 +1,4 @@
 # Matrix Factorization methods for Recommendation System
 
 ### Ilan Man
-### Latent Factor Modeling
+### April 21, 2017
